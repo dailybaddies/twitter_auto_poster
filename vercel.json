@@ -9,6 +9,10 @@
     {
       "src": "/api/tweet",
       "dest": "api/tweet.py"
+    },
+    {
+      "src": "/api/add-to-sheet",
+      "dest": "api/tweet.py"
     }
   ],
   "crons": [
