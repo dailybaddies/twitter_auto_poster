@@ -2,13 +2,11 @@ import os
 import random
 import json
 import tweepy
-import gspread
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
-# Vercel handler function
 def handler(request, response):
     try:
         # Load Twitter API keys
@@ -28,7 +26,7 @@ def handler(request, response):
         # Authenticate with Google Sheets
         creds = json.loads(google_creds_json)
         gc = gspread.service_account_from_dict(creds)
-        spreadsheet = gc.open("twitter_auto_poster_sheet")
+        spreadsheet = gc.open("TwitterBotContent") # Use your sheet's name
         worksheet = spreadsheet.sheet1
         data = worksheet.get_all_records()
 
@@ -37,8 +35,8 @@ def handler(request, response):
 
         # Select a random row from the spreadsheet
         random_item = random.choice(data)
-        image_url = random_item["image_url"] # Assuming a column named 'image_url'
-        caption = random_item["caption"]    # Assuming a column named 'caption'
+        image_url = random_item["image_url"] 
+        caption = random_item["caption"]    
 
         # Authenticate with Twitter
         client = tweepy.Client(
@@ -53,32 +51,28 @@ def handler(request, response):
         )
         api_v1 = tweepy.API(auth_v1)
         
-        # Download image from URL
-        # You'll need to add logic here to download the image from image_url
-        # and save it to a temporary file for upload.
-        # This part requires an additional library like requests.
-
-        # Example (you need to implement this part):
+        # Download image from URL (requires the 'requests' library)
         import requests
-        r = requests.get(image_url, stream=True)
-        image_file = 'temp_image.jpg'
-        with open(image_file, 'wb') as f:
-            for chunk in r.iter_content(chunk_size=1024):
-                if chunk:
-                    f.write(chunk)
+        image_response = requests.get(image_url)
+        temp_file_path = "/tmp/temp_image.jpg"
+        with open(temp_file_path, "wb") as f:
+            f.write(image_response.content)
 
         # Upload media (using the temporary file)
-        media = api_v1.media_upload(filename=image_file)
-
-        # Post the tweet
+        media = api_v1.media_upload(filename=temp_file_path)
+        
+        # Post the tweet with the media and caption
         client.create_tweet(text=caption, media_ids=[media.media_id])
-
-        print(f"Successfully posted: {caption} with image {image_url}")
-        return f"Tweet posted successfully! {caption}"
-
+        
+        print(f"Successfully posted image from URL: {image_url} with caption: {caption}")
+        return f"Tweet with image posted successfully!"
+            
+    except tweepy.TweepError as e:
+        print(f"Tweepy Error: {e}")
+        return f"Error posting tweet: {e}"
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        print(f"General Error: {e}")
         return f"An unexpected error occurred: {e}"
 
 if __name__ == "__main__":
-    print(handler(None, None))
+    handler(None, None)
