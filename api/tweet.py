@@ -2,12 +2,21 @@ import os
 import random
 import json
 import tweepy
+import gspread
+import requests
 from dotenv import load_dotenv
+from flask import Flask, jsonify, request
 
 # Load environment variables
 load_dotenv()
 
-def handler(request, response):
+# Initialize the Flask application
+app = Flask(__name__)
+
+# This is the main function that will be executed
+# It is now a Flask route instead of a generic handler
+@app.route("/api/tweet", methods=["GET"])
+def tweet_handler():
     try:
         # Load Twitter API keys
         consumer_key = os.environ.get("TWITTER_CONSUMER_KEY")
@@ -16,22 +25,22 @@ def handler(request, response):
         access_token_secret = os.environ.get("TWITTER_ACCESS_TOKEN_SECRET")
 
         if not all([consumer_key, consumer_secret, access_token, access_token_secret]):
-            return "Error: Missing Twitter API credentials."
+            return jsonify({"error": "Missing Twitter API credentials."}), 500
 
         # Load Google Sheets credentials from an environment variable
         google_creds_json = os.environ.get("GOOGLE_SHEETS_CREDENTIALS")
         if not google_creds_json:
-            return "Error: Missing Google Sheets credentials."
+            return jsonify({"error": "Missing Google Sheets credentials."}), 500
 
         # Authenticate with Google Sheets
         creds = json.loads(google_creds_json)
         gc = gspread.service_account_from_dict(creds)
-        spreadsheet = gc.open("TwitterBotContent") # Use your sheet's name
+        spreadsheet = gc.open(os.environ.get("GOOGLE_SHEET_NAME"))  # Use your sheet's name
         worksheet = spreadsheet.sheet1
         data = worksheet.get_all_records()
 
         if not data:
-            return "Error: The Google Sheet is empty."
+            return jsonify({"error": "The Google Sheet is empty."}), 500
 
         # Select a random row from the spreadsheet
         random_item = random.choice(data)
@@ -51,10 +60,9 @@ def handler(request, response):
         )
         api_v1 = tweepy.API(auth_v1)
         
-        # Download image from URL (requires the 'requests' library)
-        import requests
+        # Download image from URL
         image_response = requests.get(image_url)
-        temp_file_path = "/tmp/temp_image.jpg"
+        temp_file_path = "./temp_image.jpg"
         with open(temp_file_path, "wb") as f:
             f.write(image_response.content)
 
@@ -65,14 +73,11 @@ def handler(request, response):
         client.create_tweet(text=caption, media_ids=[media.media_id])
         
         print(f"Successfully posted image from URL: {image_url} with caption: {caption}")
-        return f"Tweet with image posted successfully!"
+        return jsonify({"message": "Tweet with image posted successfully!"}), 200
             
-    except tweepy.TweepError as e:
+    except tweepy.TwitterServerError as e:
         print(f"Tweepy Error: {e}")
-        return f"Error posting tweet: {e}"
+        return jsonify({"error": f"Error posting tweet: {str(e)}"}), 500
     except Exception as e:
         print(f"General Error: {e}")
-        return f"An unexpected error occurred: {e}"
-
-if __name__ == "__main__":
-    handler(None, None)
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
