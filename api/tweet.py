@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 import random
 import json
@@ -37,15 +38,39 @@ def tweet_handler():
         gc = gspread.service_account_from_dict(creds)
         spreadsheet = gc.open(os.environ.get("GOOGLE_SHEET_NAME"))  # Use your sheet's name
         worksheet = spreadsheet.sheet1
-        data = worksheet.get_all_records()
+        all_data = worksheet.get_all_records()
 
-        if not data:
+        if not all_data:
             return jsonify({"error": "The Google Sheet is empty."}), 500
 
         # Select a random row from the spreadsheet
-        random_item = random.choice(data)
-        image_urls = random_item["image_url"] 
-        caption = random_item["caption"]    
+
+        # --- New Logic for Date-Based Selection ---
+        selected_item = None
+        max_attempts = len(all_data) * 2  # Set a reasonable limit to prevent infinite loops
+        attempts = 0
+        
+        while selected_item is None and attempts < max_attempts:
+            random_item = random.choice(all_data)
+            last_posted_str = random_item.get("last_posted_date", "")
+            
+            if last_posted_str:
+                last_posted_date = datetime.strptime(last_posted_str, "%Y-%m-%d").date()
+                if (datetime.now().date() - last_posted_date).days >= 10:
+                    selected_item = random_item
+                else:
+                    attempts += 1
+            else:
+                # If no date exists, it's a new post, so we can use it immediately
+                selected_item = random_item
+
+        if selected_item is None:
+            return jsonify({"message": "Could not find a post older than 10 days after multiple attempts."}), 200
+
+
+        image_urls = selected_item["image_url"] 
+        caption = selected_item["caption"]    
+        row_index_to_update = all_data.index(selected_item) + 2
 
         if not image_urls or not caption:
             return jsonify({"error": "Selected row is missing 'image_url' or 'caption'."}), 500
@@ -70,22 +95,31 @@ def tweet_handler():
         for url in image_urls:
             try:
                 image_response = requests.get(url)
-                temp_file_path = f"/tmp/temp_image_{os.path.basename(url)}.jpg"
+                temp_file_path = f"/tmp/temp_image.jpg"
                 
                 with open(temp_file_path, "wb") as f:
                     f.write(image_response.content)
 
                 media = api_v1.media_upload(filename=temp_file_path)
                 media_ids.append(media.media_id)
+
+
             except Exception as e:
                 # Log a warning and continue to the next image if one fails
                 print(f"Warning: Failed to process image from URL: {url}. Details: {str(e)}")
+            finally:
+                # Always remove the temporary file to free up space
+                if os.path.exists(temp_file_path):
+                    os.remove(temp_file_path)
         
         if not media_ids:
             return jsonify({"error": "No valid images were found to post."}), 500
 
         # Post the tweet with the caption and all media IDs
         client.create_tweet(text=caption, media_ids=media_ids)
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        worksheet.update_cell(row_index_to_update, 3, today)
         
         print(f"Successfully posted image from URL: image(s) with caption: {caption}")
         return jsonify({"message": "Tweet with image posted successfully!"}), 200
