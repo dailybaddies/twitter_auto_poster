@@ -1,0 +1,20 @@
+{
+  "builds": [
+    {
+      "src": "api/tweet.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/tweet",
+      "dest": "api/tweet.py"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/tweet",
+      "schedule": "0 * * * *"
+    }
+  ]
+}

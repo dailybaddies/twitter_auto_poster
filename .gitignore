@@ -1,0 +1,29 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+
+# Distribution / packaging
+.Python
+env/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Jupyter Notebook files
+.ipynb_checkpoints
+
+# Environment variables
+.env
+
+# Database files
+*.sqlite3
+
+# Logs and other generated files
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# OS-specific files
+.DS_Store
+Thumbs.db
