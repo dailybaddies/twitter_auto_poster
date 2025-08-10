@@ -62,7 +62,7 @@ def tweet_handler():
         
         # Download image from URL
         image_response = requests.get(image_url)
-        temp_file_path = "./temp_image.jpg"
+        temp_file_path = "/tmp/temp_image.jpg"
         with open(temp_file_path, "wb") as f:
             f.write(image_response.content)
 
