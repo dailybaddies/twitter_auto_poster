@@ -1,5 +1,6 @@
 tweepy
 python-dotenv
 gspread
+google-auth
 requests
 flask
